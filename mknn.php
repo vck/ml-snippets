@@ -1,39 +1,18 @@
 <?php 
 
-$train_iris = array([7.7,2.6,6.9,2.3,0],
-					[6.0,2.2,5.0,1.5,0],
-					[6.9,3.2,5.7,2.3,0],
-					[5.6,2.8,4.9,2.0,0],
-					[7.7,2.8,6.7,2.0,0],
-					[6.3,2.7,4.9,1.8,0],
-					[6.7,3.3,5.7,2.1,0],
-					[7.2,3.2,6.0,1.8,0],
-					[6.2,2.8,4.8,1.8,0],
-					[6.1,3.0,4.9,1.8,0],
-					[5.5,2.6,4.4,1.2,1],
-					[6.1,3.0,4.6,1.4,1],
-					[5.8,2.6,4.0,1.2,1],
-					[5.0,2.3,3.3,1.0,1],
-					[5.6,2.7,4.2,1.3,1],
-					[5.7,3.0,4.2,1.2,1],
-					[5.7,2.9,4.2,1.3,1],
-					[6.2,2.9,4.3,1.3,1],
-					[5.1,2.5,3.0,1.1,1],
-					[5.7,2.8,4.1,1.3,1],
-					[5.4,3.9,1.3,0.4,2],
-					[5.1,3.5,1.4,0.3,2],
-					[5.7,3.8,1.7,0.3,2],
-					[5.1,3.8,1.5,0.3,2],
-					[5.4,3.4,1.7,0.2,2],
-					[5.1,3.7,1.5,0.4,2],
-					[4.6,3.6,1.0,0.2,2],
-					[5.1,3.3,1.7,0.5,2],
-					[4.8,3.4,1.9,0.2,2],
-					[5.0,3.0,1.6,0.2,2]);
+require 'vendor/autoload.php'; 
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Reader\Csv;
 
+$reader = new \PhpOffice\PhpSpreadsheet\Reader\Csv();
+
+$spreadsheet = $reader->load("target.csv");
+
+$sheetData = $spreadsheet->getActiveSheet()->toArray();
+ 
 function distance($a, $b){
-   $len_a = count($a);
-   $len_b = count($b);
+   $len_a = count($a)-1;
+   $len_b = count($b)-1;
 
    $dist = array();
 
@@ -45,21 +24,10 @@ function distance($a, $b){
       return sqrt(array_sum($dist));
    }else{
       die("array length not equal");
+      print_r(count($a));
+      print_r(count($b));
    }
 }
-
-/*
-for($i=0; $i < count($train); $i++){
-	for($j=0; $j < count($train); $j++){
-		$nearest = array();
-		$dist = distance($train[$i], $train[$j]);
-		if($dist!=0){
-			print_r($dist);
-		}
-	}
-}
-
-*/	
 
 function train_mknn($train, $k){
 
@@ -67,11 +35,13 @@ function train_mknn($train, $k){
 	// get label of k nearest distance data points
 	// plug those data point to S function
 	// divide over K
-	// use the validity(i) to compute weight(i)  
+	// use the validity information to compute weight information  
 	// compute i-th train data validity over every data
-	// compute i-th train data and test data weight
 
-	$length_train = count($train);
+	$datasets = train_test_split($train, 0.5);
+	$train_data = $datasets[0];
+	$test_data = $datasets[1];
+	$length_train = count($train_data);
 
 	$train_validity = array();
 
@@ -88,19 +58,17 @@ function train_mknn($train, $k){
 
 		$sorted_distance = array_values($distances);
 		sort($sorted_distance);
+		print_r($distances);
 		$k_closest_neighbors = array();
 		$s_func = array();
 
-		for($i=0; $i<$k; $i++){
-			$k_closest_neighbors[] = $sorted_distance[$i];
+		for($neighbor_index=0; $neighbor_index<$k; $neighbor_index++){
+			$k_closest_neighbors[] = $sorted_distance[$neighbor_index];
 		}
 
 		for($i=0; $i<count($k_closest_neighbors); $i++){
 			// get key of value using array_search
 			$key = array_search($k_closest_neighbors[$i], $distances);
-			//print_r($key);
-			//echo "\n";
-			// get data point on index $key
 
 			if($train[$key][4] == $train[$train_index][4]){
 				$s_func[] = 1;
@@ -108,14 +76,49 @@ function train_mknn($train, $k){
 				$s_func[] = 0;
 			}
 		}
-		//print_r($s_func);
-		$train_validity[$train_index] = array_sum($s_func)/$k;
-		//print_r($train_validity);	
+		print_r($s_func);
+		$train_validity[$train_index] = array_sum($s_func)/$k;		
 	}
-	print_r(array_values($train_validity));
-	//print_r($train_validity);
+
+	// weight voting 
+	// compute weight using validity(i) * (1/(d_i + 0.5))
+	// where i is train data index and d_i is distance(data_train[i], data_test[j])
+
+	$weight_voting = array();
+
+	for($train_index=0; $train_index<count($train_data); $train_index++){
+		for($test_index=0; $test_index<count($test_data); $test_index++){
+			print_r(count($test_data[$test_index]));
+			echo "\n";
+			print_r(count($train_data[$train_index]));
+			echo "\n";
+			$dist = distance($train_data[$train_index], $test_data[$test_index]);
+			$weight_voting[$train_index] = $train_validity[$train_index]/($dist+0.5);
+		}
+	}
+	//print_r(array_values($train_validity));
+	print_r($weight_voting);
 }
 
-train_mknn($train_iris, 3)
+function test_mknn($test, $k){
+	// return confusion matrix
+}
+
+
+function train_test_split($datasets, $ratio){
+	$train_data = array();
+	$test_data = array();
+
+	for($train_index = 0; $train_index < $ratio*count($datasets); $train_index++){
+		$train_data[] = $datasets[$train_index];
+	}
+
+	for($test_index = intval($ratio*count($datasets)); $test_index < count($datasets); $test_index++){
+		$test_data[] = $datasets[$test_index];
+	}
+	return array($train_data, $test_data);
+}
+
+train_mknn($sheetData, 5);
 
 ?>
