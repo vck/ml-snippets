@@ -10,7 +10,12 @@ $spreadsheet = $reader->load("target.csv");
 
 $sheetData = $spreadsheet->getActiveSheet()->toArray();
  
-function distance($a, $b){
+function distance(array $a, array $b): float{
+   /*
+	prevent function from computing class label, with consensus that
+	data label always on the right-most row,
+	each data $a, $b length need to be reduced by 1
+   */
    $len_a = count($a)-1;
    $len_b = count($b)-1;
 
@@ -29,20 +34,20 @@ function distance($a, $b){
    }
 }
 
-function train_mknn($train, $k){
+function train_test_distance(array $train, array $test): array{
+	$dist = array();
+	for($train_index=0; $train_index<count($train); $train_index++){
+		for($test_index=0; $test_index<count($test); $test_index++){
+			$dist[] = distance($train[$train_index], $test[$test_index]);
+		}
+	}
+	return $dist;
+}
 
-	// compute distance of i-th train data over all of data points
-	// get label of k nearest distance data points
-	// plug those data point to S function
-	// divide over K
-	// use the validity information to compute weight information  
-	// compute i-th train data validity over every data
-
-	$datasets = train_test_split($train, 0.5);
-	$train_data = $datasets[0];
-	$test_data = $datasets[1];
+function validity(array $train, int $k){
+	
+	$train_data = $train;
 	$length_train = count($train_data);
-
 	$train_validity = array();
 
 	for($train_index=0; $train_index<$length_train; $train_index++){
@@ -58,7 +63,6 @@ function train_mknn($train, $k){
 
 		$sorted_distance = array_values($distances);
 		sort($sorted_distance);
-		print_r($distances);
 		$k_closest_neighbors = array();
 		$s_func = array();
 
@@ -76,28 +80,44 @@ function train_mknn($train, $k){
 				$s_func[] = 0;
 			}
 		}
-		print_r($s_func);
+
 		$train_validity[$train_index] = array_sum($s_func)/$k;		
 	}
+	return $train_validity;
+
+}
+
+function get_weights(array $validity, array $distance, $train_length, $test_length){
+	$weight_voting = array();
+	$empty = array();
+
+	for($train_index=0; $train_index<count($train_data); $train_index++){
+		for($test_index=0; $test_index<count($test_data); $test_index++){
+			$dist = distance($train_data[$train_index], $test_data[$test_index]);
+			$weight_voting[$train_index] = $train_validity[$train_index]/($dist+0.5);
+		}
+	}
+	return $weight_voting;
+}
+
+function train_mknn(array $train, int $k){
+
+	/*
+	1. compute distance of i-th train data over all of data points
+	2. get label of k nearest distance data points
+	3. plug those data point to S function
+	4. divide over K
+	5. use the validity information to compute weight information  
+	6. compute i-th train data validity over every data
+	*/
+
+	
 
 	// weight voting 
 	// compute weight using validity(i) * (1/(d_i + 0.5))
 	// where i is train data index and d_i is distance(data_train[i], data_test[j])
 
-	$weight_voting = array();
-
-	for($train_index=0; $train_index<count($train_data); $train_index++){
-		for($test_index=0; $test_index<count($test_data); $test_index++){
-			print_r(count($test_data[$test_index]));
-			echo "\n";
-			print_r(count($train_data[$train_index]));
-			echo "\n";
-			$dist = distance($train_data[$train_index], $test_data[$test_index]);
-			$weight_voting[$train_index] = $train_validity[$train_index]/($dist+0.5);
-		}
-	}
-	//print_r(array_values($train_validity));
-	print_r($weight_voting);
+	
 }
 
 function test_mknn($test, $k){
@@ -105,20 +125,82 @@ function test_mknn($test, $k){
 }
 
 
-function train_test_split($datasets, $ratio){
-	$train_data = array();
-	$test_data = array();
+function train_test_split(array $datasets, float $ratio): array
+{
+   $train_data = array();
+   $test_data = array();
 
-	for($train_index = 0; $train_index < $ratio*count($datasets); $train_index++){
-		$train_data[] = $datasets[$train_index];
-	}
+   for($train_index = 0; $train_index < $ratio*count($datasets); $train_index++){
+      $train_data[] = $datasets[$train_index];
+   }
 
-	for($test_index = intval($ratio*count($datasets)); $test_index < count($datasets); $test_index++){
-		$test_data[] = $datasets[$test_index];
-	}
-	return array($train_data, $test_data);
+   for($test_index = intval($ratio*count($datasets)); $test_index < count($datasets); $test_index++){
+      $test_data[] = $datasets[$test_index];
+   }
+   return array($train_data, $test_data);
 }
 
-train_mknn($sheetData, 5);
 
+/*
+
+todo functions:
+
+- train
+
+--> input: training, k
+--> output: 
+
+- test
+
+--> input: y_test, y_predict
+--> output: accuracy
+
+- confusion matrix
+
+--> input: y_test, y_predict
+--> output: confusion matrix
+*/
+
+function weight_voting(array $train, array $test, array $train_validity){
+
+	// output: array of class test data
+	
+	$train_test_distance = array();
+
+	for($test_index=0; $test_index < count($train); $test_index++){
+	   for($train_index=0; $train_index < count($test); $train_index++){
+	      $train_test_distance[$test_index][$train_index] = distance($test[$test_index], $train[$train_index]);
+	   }
+	}
+
+	//print_r($train_test_distance);
+
+	$weights = array();
+	$weight_class = array();
+
+	for($test_index=0; $test_index < count($test); $test_index++){
+	   for($train_index=0; $train_index < count($train); $train_index++){
+	      $data_weight = $train_validity[$train_index]/($train_test_distance[$test_index][$train_index] + 0.5);
+	      //$weight_class[$test_index][$train_index] = $train[$train_index][4];
+	      $weight_class_item = array();
+	      $weight_class_item["weight"] = $data_weight;
+	      $weight_class_item["class"] = $train[$train_index][4];
+	      $weights[$test_index][$train_index] = $weight_class_item;
+	   }
+
+	   // cari kelas dengan nilai weight voting tertinggi, kelas data uji adalah k kelas mayoritas
+	   // dengan weight paling tinggi
+	}
+
+	//print_r($weight_class);
+	//print_r($train[0][4]);
+	print_r($weights);
+	}
+
+$splited_datasets = train_test_split($sheetData, 0.5);
+$train = $splited_datasets[0];
+$test = $splited_datasets[1];
+$train_validity = validity($train, 3);
+
+weight_voting($train, $test, $train_validity);
 ?>
