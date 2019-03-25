@@ -162,9 +162,6 @@ todo functions:
 */
 
 function weight_voting(array $train, array $test, array $train_validity){
-
-	// output: array of class test data
-	
 	$train_test_distance = array();
 
 	for($test_index=0; $test_index < count($train); $test_index++){
@@ -172,30 +169,32 @@ function weight_voting(array $train, array $test, array $train_validity){
 	      $train_test_distance[$test_index][$train_index] = distance($test[$test_index], $train[$train_index]);
 	   }
 	}
-
-	//print_r($train_test_distance);
-
 	$weights = array();
 	$weight_class = array();
-
+	
 	for($test_index=0; $test_index < count($test); $test_index++){
 	   for($train_index=0; $train_index < count($train); $train_index++){
 	      $data_weight = $train_validity[$train_index]/($train_test_distance[$test_index][$train_index] + 0.5);
-	      //$weight_class[$test_index][$train_index] = $train[$train_index][4];
 	      $weight_class_item = array();
 	      $weight_class_item["weight"] = $data_weight;
 	      $weight_class_item["class"] = $train[$train_index][4];
 	      $weights[$test_index][$train_index] = $weight_class_item;
-	   }
-
-	   // cari kelas dengan nilai weight voting tertinggi, kelas data uji adalah k kelas mayoritas
-	   // dengan weight paling tinggi
 	}
 
-	//print_r($weight_class);
-	//print_r($train[0][4]);
-	print_r($weights);
+	$predicted_class = array();
+
+	for($test_index=0; $test_index < count($test); $test_index++){
+		for($row=0; $row < count($weights[$test_index]); $row++){
+				echo $weights[$test_index][$row]['class'], " ", $weights[$test_index][$row]['weight'];
+				echo "\n";
+			}
+		}
+	print_r($predicted_class);
 	}
+
+function accuracy(array $y_test, array $y_predict){
+
+}
 
 $splited_datasets = train_test_split($sheetData, 0.5);
 $train = $splited_datasets[0];
@@ -203,4 +202,6 @@ $test = $splited_datasets[1];
 $train_validity = validity($train, 3);
 
 weight_voting($train, $test, $train_validity);
+
+
 ?>
