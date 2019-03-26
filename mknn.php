@@ -1,5 +1,11 @@
 <?php 
 
+/*
+modified k-nearest neighbor 
+
+reference: http://www.iaeng.org/publication/WCECS2008/WCECS2008_pp831-834.pdf
+*/
+
 require 'vendor/autoload.php'; 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Reader\Csv;
@@ -12,9 +18,9 @@ $sheetData = $spreadsheet->getActiveSheet()->toArray();
  
 function distance(array $a, array $b): float{
    /*
-	prevent function from computing class label, with consensus that
-	data label always on the right-most row,
-	each data $a, $b length need to be reduced by 1
+   prevent function from computing class label, with consensus that
+   data label always on the right-most row,
+   each data $a, $b length need to be reduced by 1
    */
    $len_a = count($a)-1;
    $len_b = count($b)-1;
@@ -23,7 +29,7 @@ function distance(array $a, array $b): float{
 
    if($len_b == $len_a){
       for($i=0; $i<$len_a; $i++){
-      	$res = ($a[$i]-$b[$i])**2;
+         $res = ($a[$i]-$b[$i])**2;
          $dist[] = $res;
       }
       return sqrt(array_sum($dist));
@@ -35,95 +41,57 @@ function distance(array $a, array $b): float{
 }
 
 function train_test_distance(array $train, array $test): array{
-	$dist = array();
-	for($train_index=0; $train_index<count($train); $train_index++){
-		for($test_index=0; $test_index<count($test); $test_index++){
-			$dist[] = distance($train[$train_index], $test[$test_index]);
-		}
-	}
-	return $dist;
+   $dist = array();
+   for($train_index=0; $train_index<count($train); $train_index++){
+      for($test_index=0; $test_index<count($test); $test_index++){
+         $dist[] = distance($train[$train_index], $test[$test_index]);
+      }
+   }
+   return $dist;
 }
 
 function validity(array $train, int $k){
-	
-	$train_data = $train;
-	$length_train = count($train_data);
-	$train_validity = array();
+   
+   $train_data = $train;
+   $length_train = count($train_data);
+   $train_validity = array();
 
-	for($train_index=0; $train_index<$length_train; $train_index++){
-		$distances = array();
-		$validity = array();
-		for($j=0; $j<$length_train; $j++){
-			$dist = distance($train[$train_index], $train[$j]);
-			if($dist != 0){
-				$distances[$j] = $dist;
-			}
-		}
-		// get k closest data point
+   for($train_index=0; $train_index<$length_train; $train_index++){
+      $distances = array();
+      $validity = array();
+      for($j=0; $j<$length_train; $j++){
+         $dist = distance($train[$train_index], $train[$j]);
+         if($dist != 0){
+            $distances[$j] = $dist;
+         }
+      }
+      // get k closest data point
 
-		$sorted_distance = array_values($distances);
-		sort($sorted_distance);
-		$k_closest_neighbors = array();
-		$s_func = array();
+      $sorted_distance = array_values($distances);
+      sort($sorted_distance);
+      $k_closest_neighbors = array();
+      $s_func = array();
 
-		for($neighbor_index=0; $neighbor_index<$k; $neighbor_index++){
-			$k_closest_neighbors[] = $sorted_distance[$neighbor_index];
-		}
+      for($neighbor_index=0; $neighbor_index<$k; $neighbor_index++){
+         $k_closest_neighbors[] = $sorted_distance[$neighbor_index];
+      }
 
-		for($i=0; $i<count($k_closest_neighbors); $i++){
-			// get key of value using array_search
-			$key = array_search($k_closest_neighbors[$i], $distances);
+      for($i=0; $i<count($k_closest_neighbors); $i++){
+         // get key of value using array_search
+         $key = array_search($k_closest_neighbors[$i], $distances);
 
-			if($train[$key][4] == $train[$train_index][4]){
-				$s_func[] = 1;
-			}else{
-				$s_func[] = 0;
-			}
-		}
+         if($train[$key][4] == $train[$train_index][4]){
+            $s_func[] = 1;
+         }else{
+            $s_func[] = 0;
+         }
+      }
 
-		$train_validity[$train_index] = array_sum($s_func)/$k;		
-	}
-	return $train_validity;
+      $train_validity[$train_index] = array_sum($s_func)/$k;      
+   }
+   return $train_validity;
 
 }
-
-function get_weights(array $validity, array $distance, $train_length, $test_length){
-	$weight_voting = array();
-	$empty = array();
-
-	for($train_index=0; $train_index<count($train_data); $train_index++){
-		for($test_index=0; $test_index<count($test_data); $test_index++){
-			$dist = distance($train_data[$train_index], $test_data[$test_index]);
-			$weight_voting[$train_index] = $train_validity[$train_index]/($dist+0.5);
-		}
-	}
-	return $weight_voting;
-}
-
-function train_mknn(array $train, int $k){
-
-	/*
-	1. compute distance of i-th train data over all of data points
-	2. get label of k nearest distance data points
-	3. plug those data point to S function
-	4. divide over K
-	5. use the validity information to compute weight information  
-	6. compute i-th train data validity over every data
-	*/
-
-	
-
-	// weight voting 
-	// compute weight using validity(i) * (1/(d_i + 0.5))
-	// where i is train data index and d_i is distance(data_train[i], data_test[j])
-
-	
-}
-
-function test_mknn($test, $k){
-	// return confusion matrix
-}
-
 
 function train_test_split(array $datasets, float $ratio): array
 {
@@ -140,68 +108,73 @@ function train_test_split(array $datasets, float $ratio): array
    return array($train_data, $test_data);
 }
 
+function weight_voting(array $train, array $test, array $train_validity, int $k): array{
+   $train_test_distance = array();
 
-/*
+   for($test_index=0; $test_index < count($train); $test_index++){
+      for($train_index=0; $train_index < count($test); $train_index++){
+         $train_test_distance[$test_index][$train_index] = distance($test[$test_index], $train[$train_index]);
+      }
+   }
+   $weights = array();
+   $weight_class = array();
+   
+   for($test_index=0; $test_index < count($test); $test_index++){
+      for($train_index=0; $train_index < count($train); $train_index++){
+         $data_weight = $train_validity[$train_index]/($train_test_distance[$test_index][$train_index] + 0.5);
+         $weight_class_item = array();
+         $weight_class_item["weight"] = $data_weight;
+         $weight_class_item["class"] = $train[$train_index][4];
+         $weights[$test_index][$train_index] = $weight_class_item;
+      }
+   }
+   
+   $predicted_class = array();
+   
+   for($row=0; $row<count($weights); $row++){
+      $i_test_weights = $weights[$row];
+      $largest_weights = array_column($i_test_weights, "weight");
+      $i_class = array_column($i_test_weights, "class");
+      array_multisort($largest_weights, SORT_DESC, $i_class, SORT_ASC, $i_test_weights); 
+      // https://www.php.net/manual/en/function.array-multisort.php
+      $majority_class = array_column($i_test_weights, "class");
+      $sliced_majority = array_slice($majority_class, 0, $k);
+      $predicted_class[] = $sliced_majority[0];
+   }
+   return $predicted_class;
+}
 
-todo functions:
+function data_class(array $data): array
+{
+   $class = array();
+   for($i=0; $i<count($data); $i++){
+      $class[] = end($data[$i]);
+   }
+   return $class;
+}
 
-- train
+function accuracy(array $y_predict, array $y_test): array
+{
+   if(count($y_predict)==count($y_test)){
+      for($i=0; $i<count($y_test); $i++){
 
---> input: training, k
---> output: 
-
-- test
-
---> input: y_test, y_predict
---> output: accuracy
-
-- confusion matrix
-
---> input: y_test, y_predict
---> output: confusion matrix
-*/
-
-function weight_voting(array $train, array $test, array $train_validity){
-	$train_test_distance = array();
-
-	for($test_index=0; $test_index < count($train); $test_index++){
-	   for($train_index=0; $train_index < count($test); $train_index++){
-	      $train_test_distance[$test_index][$train_index] = distance($test[$test_index], $train[$train_index]);
-	   }
-	}
-	$weights = array();
-	$weight_class = array();
-	
-	for($test_index=0; $test_index < count($test); $test_index++){
-	   for($train_index=0; $train_index < count($train); $train_index++){
-	      $data_weight = $train_validity[$train_index]/($train_test_distance[$test_index][$train_index] + 0.5);
-	      $weight_class_item = array();
-	      $weight_class_item["weight"] = $data_weight;
-	      $weight_class_item["class"] = $train[$train_index][4];
-	      $weights[$test_index][$train_index] = $weight_class_item;
-	}
-
-	$predicted_class = array();
-
-	for($test_index=0; $test_index < count($test); $test_index++){
-		for($row=0; $row < count($weights[$test_index]); $row++){
-				echo $weights[$test_index][$row]['class'], " ", $weights[$test_index][$row]['weight'];
-				echo "\n";
-			}
-		}
-	print_r($predicted_class);
-	}
-
-function accuracy(array $y_test, array $y_predict){
-
+      }
+   }
 }
 
 $splited_datasets = train_test_split($sheetData, 0.5);
 $train = $splited_datasets[0];
 $test = $splited_datasets[1];
 $train_validity = validity($train, 3);
+$y_test = data_class($test);
 
-weight_voting($train, $test, $train_validity);
+$predicted = weight_voting($train, $test, $train_validity, 7);
 
+
+for($i=0; $i<count($y_test); $i++){
+   print_r($predicted[$i]);
+   print_r($y_test[$i]);
+   echo "\n";
+}
 
 ?>
