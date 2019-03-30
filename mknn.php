@@ -7,14 +7,10 @@ reference: http://www.iaeng.org/publication/WCECS2008/WCECS2008_pp831-834.pdf
 */
 
 require 'vendor/autoload.php'; 
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Reader\Csv;
+use Phpml\Metric\Accuracy;
+use Phpml\Metric\ConfusionMatrix;
+use Phpml\CrossValidation\RandomSplit;
 
-$reader = new \PhpOffice\PhpSpreadsheet\Reader\Csv();
-
-$spreadsheet = $reader->load("target.csv");
-
-$sheetData = $spreadsheet->getActiveSheet()->toArray();
  
 function distance(array $a, array $b): float{
    /*
@@ -109,10 +105,13 @@ function train_test_split(array $datasets, float $ratio): array
 }
 
 function weight_voting(array $train, array $test, array $train_validity, int $k): array{
+   print_r(count($train));
+   echo "\n";
+   print_r(count($test));
    $train_test_distance = array();
 
-   for($test_index=0; $test_index < count($train); $test_index++){
-      for($train_index=0; $train_index < count($test); $train_index++){
+   for($test_index=0; $test_index < count($test); $test_index++){
+      for($train_index=0; $train_index < count($train); $train_index++){
          $train_test_distance[$test_index][$train_index] = distance($test[$test_index], $train[$train_index]);
       }
    }
@@ -136,10 +135,10 @@ function weight_voting(array $train, array $test, array $train_validity, int $k)
       $largest_weights = array_column($i_test_weights, "weight");
       $i_class = array_column($i_test_weights, "class");
       array_multisort($largest_weights, SORT_DESC, $i_class, SORT_ASC, $i_test_weights); 
-      // https://www.php.net/manual/en/function.array-multisort.php
+      
       $majority_class = array_column($i_test_weights, "class");
       $sliced_majority = array_slice($majority_class, 0, $k);
-      $predicted_class[] = $sliced_majority[0];
+      $predicted_class[] = (int) $sliced_majority[0];
    }
    return $predicted_class;
 }
@@ -148,33 +147,9 @@ function data_class(array $data): array
 {
    $class = array();
    for($i=0; $i<count($data); $i++){
-      $class[] = end($data[$i]);
+      $class[] = (int) end($data[$i]);
    }
    return $class;
 }
-
-function accuracy(array $y_predict, array $y_test): array
-{
-   if(count($y_predict)==count($y_test)){
-      for($i=0; $i<count($y_test); $i++){
-
-      }
-   }
-}
-
-$splited_datasets = train_test_split($sheetData, 0.5);
-$train = $splited_datasets[0];
-$test = $splited_datasets[1];
-$train_validity = validity($train, 3);
-$y_test = data_class($test);
-
-$predicted = weight_voting($train, $test, $train_validity, 7);
-
-
-for($i=0; $i<count($y_test); $i++){
-   print_r($predicted[$i]);
-   print_r($y_test[$i]);
-   echo "\n";
-}
-
 ?>
+   
